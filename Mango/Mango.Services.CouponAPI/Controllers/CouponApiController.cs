@@ -12,7 +12,7 @@ using System.Runtime.InteropServices;
 
 namespace Mango.Services.CouponAPI.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/Coupon")]
     [ApiController]
     public class CouponApiController : ControllerBase
     {
@@ -115,6 +115,7 @@ namespace Mango.Services.CouponAPI.Controllers
         }
 
         [HttpDelete]
+        [Route("{id:int}")]
         public ResponseDto Delete(int id)
         {
             try
