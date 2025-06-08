@@ -1,22 +1,25 @@
 ﻿using Mango.Web.Models;
 using Mango.Web.Service.Iservice;
 using Mango.Web.Utility;
-using Microsoft.AspNetCore.Identity.Data;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Newtonsoft.Json;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+
 
 namespace Mango.Web.Controllers
 {
     public class AuthController : Controller
     {
         private readonly IAuthService _authService;
-        public AuthController(IAuthService authService)
+        private readonly ITokenProvider _tokenProvider;
+        public AuthController(IAuthService authService, ITokenProvider tokenProvider)
         {
             _authService = authService;
+            _tokenProvider = tokenProvider;
         }
 
         [HttpGet]
@@ -34,14 +37,16 @@ namespace Mango.Web.Controllers
             if (responseDto != null && responseDto.IsSuccess)
             {
                 LoginResponseDto loginResponseDto = JsonConvert.DeserializeObject<LoginResponseDto>(Convert.ToString(responseDto.Result));
+                await SignInUser(loginResponseDto);
+                _tokenProvider.SetToken(loginResponseDto.Token);
                 return RedirectToAction("Index", "Home");
             }
             else
             {
-                ModelState.AddModelError("CustomError", responseDto.Message);
+                TempData["error"] = responseDto.Message;
                 return View(obj);
             }
-             
+
         }
 
         [HttpGet]
@@ -66,7 +71,7 @@ namespace Mango.Web.Controllers
             ResponseDto assignRole;
             if (result != null && result.IsSuccess)
             {
-                if (!string.IsNullOrEmpty(obj.Role))
+                if (string.IsNullOrEmpty(obj.Role))
                 {
                     obj.Role = SD.RoleCustomer;
                 }
@@ -77,6 +82,10 @@ namespace Mango.Web.Controllers
                     return RedirectToAction(nameof(Login));
                 }
 
+            }
+            else
+            {
+                TempData["error"] = result.Message;
             }
             var roleList = new List<SelectListItem>()
              {
@@ -90,10 +99,25 @@ namespace Mango.Web.Controllers
         }
 
         [HttpGet]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
+            await HttpContext.SignOutAsync();
+            _tokenProvider.ClearToken();
+            return RedirectToAction("Index","Home");
+        }
 
-            return View();
+        private async Task SignInUser(LoginResponseDto loginResponse)
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var jwt = handler.ReadJwtToken(loginResponse.Token);
+            var identitty = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme);
+            identitty.AddClaim(new Claim(JwtRegisteredClaimNames.Email,jwt.Claims.FirstOrDefault(b=>b.Type== JwtRegisteredClaimNames.Email).Value ));
+            identitty.AddClaim(new Claim(JwtRegisteredClaimNames.Sub, jwt.Claims.FirstOrDefault(b => b.Type == JwtRegisteredClaimNames.Sub).Value));
+            identitty.AddClaim(new Claim(JwtRegisteredClaimNames.Name, jwt.Claims.FirstOrDefault(b => b.Type == JwtRegisteredClaimNames.Name).Value));
+            identitty.AddClaim(new Claim(ClaimTypes.Name, jwt.Claims.FirstOrDefault(b => b.Type == JwtRegisteredClaimNames.Email).Value));
+            identitty.AddClaim(new Claim(ClaimTypes.Role, jwt.Claims.FirstOrDefault(b => b.Type == "role").Value));
+            var principal = new ClaimsPrincipal(identitty);
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
         }
 
     }

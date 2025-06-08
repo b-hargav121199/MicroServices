@@ -38,7 +38,7 @@ namespace Mango.Web.Service
                 ApiType = SD.ApiType.Post,
                 Data = registrationRequestDto,
                 Url = SD.AuthAPIBase + "/api/auth/register"
-            });
+            },withBearer: false);
         }
     }
 }
