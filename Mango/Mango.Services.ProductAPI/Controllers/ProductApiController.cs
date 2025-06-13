@@ -12,7 +12,6 @@ namespace Mango.Services.ProductAPI.Controllers
 {
     [Route("api/Product")]
     [ApiController]
-    [Authorize]
     public class ProductApiController : ControllerBase
     {
 
